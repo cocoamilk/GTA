@@ -54,9 +54,6 @@ public class Activator extends AbstractCyActivator {
 		LoadVizmapFileTaskFactory loadVizmapFileTaskFactory = getService(bc, LoadVizmapFileTaskFactory.class);
 		SynchronousTaskManager<?> synchronousTaskManagerServiceRef = getService(bc, SynchronousTaskManager.class);
 
-		// CyHelpBroker cyHelpBroker = getService(bc, CyHelpBroker.class);
-
-		//
 		ServicesUtil.cySwingApplicationServiceRef = cySwingApplicationServiceRef;
 		ServicesUtil.cyApplicationManagerServiceRef = cyApplicationManagerServiceRef;
 		ServicesUtil.cyNetworkViewManagerServiceRef = cyNetworkViewManagerServiceRef;
@@ -76,13 +73,9 @@ public class Activator extends AbstractCyActivator {
 
 		//
 
-//		ActivePathFinderParameters apfParams = new ActivePathFinderParameters();
-//
 //		NetworkSelectorPanel networkSelectorPanel = new NetworkSelectorPanel(cyApplicationManagerServiceRef,
 //				cyNetworkManagerServiceRef);
 
-
-//		ActivePathsParameterPanel mainPanel = new ActivePathsParameterPanel(apfParams, networkSelectorPanel);
 
 		GTANetworkSelectorPanel gtaNetworkSelectorPanel = new GTANetworkSelectorPanel(cyApplicationManagerServiceRef,
 				cyNetworkManagerServiceRef);
