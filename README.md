@@ -3,7 +3,14 @@ GTA Module
 
 GTA Module is suitable for finding network modules related to a complex disease such as cancer, based on gene expression profile of cancerous and non-cancerous samples. 
 
+Installation
+==============
+1. Download from Cytoscape app store (not approved yet)
+2. Download [GTA version 0.0.1](build/GTA-impl-0.0.1.jar). Then go to menu Apps -> App Manager.... From Install Apps tab, choose Install from File button, then choose downloaded file.
+
+
 Tutorial
+==============
 
 1. Load network
 In Cytoscape go to menu File -> Import -> Network -> File. Choose [swiss-cancer-network.sif](sample-data/swiss-cancer-network.sif) file. The network then is created. You may not crate view for this network, it may take time.
