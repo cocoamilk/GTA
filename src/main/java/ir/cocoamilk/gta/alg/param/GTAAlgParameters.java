@@ -9,7 +9,7 @@ public class GTAAlgParameters {
 	private CyNetwork cyNetwork;
 	private boolean generateTScores;
 	private boolean generateDegrees;
-	private int subnetSize;
+	private int levelOneSubnetSize, levelTwoSubnetSize;
 	private int resultingNetworkCount;
 	public static final int SUBNETWORK_MAX_SIZE_MAX = 20;
 	public static final int SUBNETWORK_MAX_SIZE_DEFAULT = 10;
@@ -18,17 +18,21 @@ public class GTAAlgParameters {
 	
 	//
 	public static final int RESULTING_NETWORK_MAX_TRY_IF_NO_ANSWER = 10;
-
+	
+	private NetFilteringMethod netFilteringMethod;
 
 	public GTAAlgParameters(CyNetwork cyNetwork, GTAAlgParametersAttrSelection normalSelParam,
-			GTAAlgParametersAttrSelection cancerSelParam, boolean generateTScores, boolean generateDegrees, int subnetSize, int resultingNetworkCount) {
+			GTAAlgParametersAttrSelection cancerSelParam, boolean generateTScores, boolean generateDegrees, int levelOneSubnetSize, int levelTwoSubnetSize, int resultingNetworkCount,
+			NetFilteringMethod netFilteringMethod) {
 		this.setCyNetwork(cyNetwork);
 		this.normalSelParam = normalSelParam;
 		this.cancerSelParam = cancerSelParam;
 		this.generateTScores = generateTScores;
 		this.generateDegrees = generateDegrees;
-		this.subnetSize = subnetSize;
 		this.resultingNetworkCount = resultingNetworkCount;
+		this.levelOneSubnetSize = levelOneSubnetSize;
+		this.levelTwoSubnetSize = levelTwoSubnetSize;
+		this.netFilteringMethod = netFilteringMethod;
 	}
 
 	public GTAAlgParametersAttrSelection getCancerSelParam() {
@@ -71,14 +75,6 @@ public class GTAAlgParameters {
 		this.generateDegrees = generateDegrees;
 	}
 
-	public int getSubnetSize() {
-		return subnetSize;
-	}
-
-	public void setSubnetSize(int subnetSize) {
-		this.subnetSize = subnetSize;
-	}
-
 	public int getResultingNetworkCount() {
 		return resultingNetworkCount;
 	}
@@ -86,7 +82,29 @@ public class GTAAlgParameters {
 	public void setResultingNetworkCount(int resultingNetworkCount) {
 		this.resultingNetworkCount = resultingNetworkCount;
 	}
-	
-	
 
+	public int getLevelOneSubnetSize() {
+		return levelOneSubnetSize;
+	}
+
+	public void setLevelOneSubnetSize(int levelOneSubnetSize) {
+		this.levelOneSubnetSize = levelOneSubnetSize;
+	}
+
+	public int getLevelTwoSubnetSize() {
+		return levelTwoSubnetSize;
+	}
+
+	public void setLevelTwoSubnetSize(int levelTwoSubnetSize) {
+		this.levelTwoSubnetSize = levelTwoSubnetSize;
+	}
+
+	public NetFilteringMethod getNetFilteringMethod() {
+		return netFilteringMethod;
+	}
+	
+	public void setNetFilteringMethod(NetFilteringMethod netFilteringMethod) {
+		this.netFilteringMethod = netFilteringMethod;
+	}
+	
 }

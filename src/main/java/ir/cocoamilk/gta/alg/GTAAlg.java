@@ -27,15 +27,18 @@ import org.cytoscape.model.subnetwork.CyRootNetwork;
 import org.cytoscape.model.subnetwork.CySubNetwork;
 import org.cytoscape.view.layout.CyLayoutAlgorithm;
 import org.cytoscape.view.model.CyNetworkView;
+import org.cytoscape.view.model.View;
 import org.cytoscape.view.presentation.property.BasicVisualLexicon;
 import org.cytoscape.work.AbstractTask;
 import org.cytoscape.work.Task;
+import org.cytoscape.work.TaskIterator;
 import org.cytoscape.work.TaskMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ir.cocoamilk.gta.alg.param.GTAAlgParameters;
 import ir.cocoamilk.gta.alg.param.GTAAlgParametersAttrSelection;
+import ir.cocoamilk.gta.alg.param.NetFilteringMethod;
 import ir.cocoamilk.gta.service.ServicesUtil;
 
 public class GTAAlg extends AbstractTask {
@@ -48,7 +51,6 @@ public class GTAAlg extends AbstractTask {
 	private int size;
 	private long[] nodeIndexToId;
 	private Map<Long, Integer> nodeIdToIndex;
-	private VectorDouble[] normalExpressionSet, cancerExpressionSet;
 	private double[] tScores;
 	private int[] degrees;
 
@@ -95,6 +97,7 @@ public class GTAAlg extends AbstractTask {
 		VectorDouble[] normalExpressionSetRaw = fillExpressionSets(net, params.getNormalSelParam());
 		VectorDouble[] cancerExpressionSetRaw = fillExpressionSets(net, params.getCancerSelParam());
 
+		VectorDouble[] normalExpressionSet, cancerExpressionSet;
 		normalExpressionSet = new VectorDouble[normalExpressionSetRaw.length];
 		cancerExpressionSet = new VectorDouble[cancerExpressionSetRaw.length];
 
@@ -108,6 +111,7 @@ public class GTAAlg extends AbstractTask {
 
 		logger.error("convertParameters: " + normalExpressionSet + ", " + cancerExpressionSet);
 
+		tScores = computeAbsTScores(normalExpressionSet, cancerExpressionSet);
 	}
 
 	interface ArrayFillerAlgorithm<T> {
@@ -153,7 +157,8 @@ public class GTAAlg extends AbstractTask {
 		return r;
 	}
 
-	private double[] computeAbsTScores() {
+	private double[] computeAbsTScores(final VectorDouble[] normalExpressionSet,
+			final VectorDouble[] cancerExpressionSet) {
 		// double[] r = new double[size];
 		// CyNetwork net = params.getCyNetwork();
 		// final String primaryKeyColname =
@@ -248,11 +253,11 @@ public class GTAAlg extends AbstractTask {
 		Integer[] indices = subIndices.clone();
 		System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
 		Arrays.sort(indices, new Comparator<Integer>() {
-//			private final double EPSILON = 1e-7;
+			// private final double EPSILON = 1e-7;
 			@Override
 			public int compare(Integer a, Integer b) {
-//				if (Math.abs(tScores[a] - tScores[b]) < EPSILON)
-//					return 0;
+				// if (Math.abs(tScores[a] - tScores[b]) < EPSILON)
+				// return 0;
 				return tScores[a] < tScores[b] ? 1 : tScores[a] == tScores[b] ? 0 : -1;
 			}
 		});
@@ -275,30 +280,35 @@ public class GTAAlg extends AbstractTask {
 		if (nodeIdToIndex.get(parent.getSUID()) == null)
 			return subNetworks;
 
-		List<CyNode> levelTwos = net.getNeighborList(parent, CyEdge.Type.ANY);
-		Set<CyNode> levelOneSet = new HashSet<CyNode>(levelTwos);
-		for (CyNode agent : levelTwos) {
+		List<CyNode> levelOnes = net.getNeighborList(parent, CyEdge.Type.ANY);
+
+		List<CyNode> filteredLevelOnes = filterNetworkByClusteringCoefficient(parent, levelOnes,
+				params.getLevelOneSubnetSize());
+		Set<CyNode> filteredLevelOneSet = new HashSet<CyNode>(filteredLevelOnes);
+
+		for (CyNode agent : filteredLevelOnes) {
 			if (nodeIdToIndex.get(agent.getSUID()) == null)
 				continue;
-			List<CyNode> subNet = new ArrayList<CyNode>();
+			List<CyNode> levelTwos = new ArrayList<CyNode>();
 
 			List<CyNode> neighbors = net.getNeighborList(agent, CyEdge.Type.ANY);
 			for (CyNode nei : neighbors) {
-				if (!nei.equals(parent) && !levelOneSet.contains(nei) && nodeIdToIndex.get(nei.getSUID()) != null)
-					subNet.add(nei);
+				if (!nei.equals(parent) && !filteredLevelOneSet.contains(nei)
+						&& nodeIdToIndex.get(nei.getSUID()) != null)
+					levelTwos.add(nei);
 			}
-			
-			//remote non-valid tScores
+
+			// remove non-valid tScores
 			List<CyNode> filteredSubNet = new ArrayList<CyNode>();
-			for (CyNode n : subNet)
+			for (CyNode n : levelTwos)
 				if (!Double.isNaN(tScores[nodeIdToIndex.get(n.getSUID())]))
 					filteredSubNet.add(n);
-			
-			subNet = filteredSubNet;
 
-			subNet = filterNetworkByClusteringCoefficient(subNet);
+			levelTwos = filteredSubNet;
 
-			subNetworks.add(new ThreeLevelSubNetwork(parent, agent, subNet));
+			levelTwos = filterNetworkByClusteringCoefficient(agent, levelTwos, params.getLevelTwoSubnetSize());
+
+			subNetworks.add(new ThreeLevelSubNetwork(parent, agent, levelTwos));
 		}
 		return subNetworks;
 	}
@@ -341,27 +351,104 @@ public class GTAAlg extends AbstractTask {
 		return total / subNetwork.size();
 	}
 
-	private List<CyNode> filterNetworkByClusteringCoefficient(List<CyNode> subNet) {
+	private List<CyNode> filterNetworkByClusteringCoefficient(CyNode center, List<CyNode> subNet, int maxSubnetSize) {
 		CyNetwork net = params.getCyNetwork();
-		if (subNet.size() < params.getSubnetSize())
+		if (subNet.size() < maxSubnetSize)
 			return subNet;
 
 		// TODO: removed for speed.
 		// {
-		// Integer[] originialSubnetworkIndices = getSubNetworkIndices(subNet);
+
+		// cloning to handle sorting
+		subNet = new ArrayList<CyNode>(subNet);
+		Set<CyNode> toBeRemovedNodes = new HashSet<CyNode>();
+
+		if (params.getNetFilteringMethod() == NetFilteringMethod.FILTER_BY_CLUSTERING_COEFFICIENT) {
+			Set<CyNode> subnetSet = new HashSet<CyNode>(subNet);
+			final Map<CyNode, Set<CyNode>> subnetNei = new HashMap<CyNode, Set<CyNode>>();
+			for (CyNode v : subNet) {
+				subnetNei.put(v, new HashSet<CyNode>());
+				for (CyNode u : net.getNeighborList(v, CyEdge.Type.ANY))
+					if (subnetSet.contains(u))
+						subnetNei.get(v).add(u);
+			}
+
+			// Map<CyNode, Integer> subnetMutFriendCount = new HashMap<CyNode,
+			// Integer>();
+			int allMutualCount = 0, allPotentialMutualCount = 0;
+			for (CyNode v : subNet) {
+				int cnt = 0;
+				for (CyNode u : subnetNei.get(v)) {
+					for (CyNode w : subnetNei.get(v)) {
+						if (subnetNei.get(u).contains(w)) {
+							cnt++;
+						}
+					}
+				}
+				// subnetMutFriendCount.put(v, cnt);
+				int d = subnetNei.get(v).size();
+				allPotentialMutualCount += d * (d - 1) / 2;
+				allMutualCount += cnt;
+			}
+
+			subNet.sort(new Comparator<CyNode>() {
+				@Override
+				public int compare(CyNode v, CyNode u) {
+					return Integer.compare(subnetNei.get(v).size(), subnetNei.get(u).size());
+				}
+			});
+
+			for (CyNode v : subNet) {
+				if (subNet.size() - toBeRemovedNodes.size() <= maxSubnetSize)
+					break;
+
+				int ifMutualCount = 0, ifPotentialMutualCount = 0;
+				for (CyNode u : subnetNei.get(v)) {
+					ifMutualCount += interSectionSize(subnetNei.get(v), subnetNei.get(u));
+					ifPotentialMutualCount += subnetNei.get(u).size() - 1;
+				}
+
+				if ((allPotentialMutualCount - ifPotentialMutualCount) * 1.0
+						/ (allMutualCount - ifMutualCount) > (allPotentialMutualCount) * 1.0 / (allMutualCount)) {
+					for (CyNode u : subnetNei.get(v)) {
+						subnetNei.get(u).remove(v);
+					}
+					toBeRemovedNodes.add(v);
+					allMutualCount -= ifMutualCount;
+					allPotentialMutualCount -= ifPotentialMutualCount;
+
+				}
+			}
+
+		}
+
+		subNet.sort(new Comparator<CyNode>() {
+			@Override
+			public int compare(CyNode v, CyNode u) {
+				return -Double.compare(tScores[nodeIdToIndex.get(v.getSUID())],
+						tScores[nodeIdToIndex.get(u.getSUID())]);
+			}
+		});
+
+		List<CyNode> result = new ArrayList<CyNode>();
+		for (CyNode v : subNet) {
+			if (result.size() >= maxSubnetSize)
+				break;
+			if (!toBeRemovedNodes.contains(v))
+				result.add(v);
+		}
+
+		return result;
+
 		// List<CyNode> relaxedSubNetwork = new ArrayList<CyNode>(subNet);
-		//
-		//
-		// Integer[] degreeSortedIndices =
-		// sortByDegree(originialSubnetworkIndices);
 		// double prevClusteringCoefficient =
 		// clusteringCoefficient(relaxedSubNetwork);
-		// for (int ii=degreeSortedIndices.length-1; ii>0; ii--) {
+		// for (int ii = degreeSortedIndices.length - 1; ii > 0; ii--) {
 		// int i = degreeSortedIndices[ii];
 		// CyNode iNode = net.getNode(nodeIndexToId[i]);
 		//
 		// relaxedSubNetwork.remove(iNode);
-		// //We can compute it faster for all the networks together
+		// // We can compute it faster for all the networks together
 		// double newCC = clusteringCoefficient(relaxedSubNetwork);
 		// if (newCC > prevClusteringCoefficient) {
 		// prevClusteringCoefficient = newCC;
@@ -371,39 +458,50 @@ public class GTAAlg extends AbstractTask {
 		// }
 		// }
 		// subNet = relaxedSubNetwork;
+
 		// }
 
-		// TODO: it is changed from matlab to get connected component with
-		// maximum minimum tScore
-		if (subNet.size() > params.getSubnetSize()) {
-			Integer[] subnetworkIndices = getSubNetworkIndices(subNet);
-			Integer[] sortedIndices = sortByTScore(subnetworkIndices);
+		// // TODO: it is changed from matlab to get connected component with
+		// // maximum minimum tScore
+		// if (subNet.size() > maxSubnetSize) {
+		// Integer[] subnetworkIndices = getSubNetworkIndices(subNet);
+		// Integer[] sortedIndices = sortByTScore(subnetworkIndices);
+		//
+		// // for (int i=0; i<maxSubnetworkSize; i++) {
+		// // subNet.add(net.getNode(nodeIndexToId[sortedIndices[i]]));
+		// // }
+		//
+		// Set<CyNode> subnetworkNodes = new HashSet<CyNode>();
+		//
+		// for (Integer subnetworkIndex : subnetworkIndices) {
+		// subnetworkNodes.add(net.getNode(nodeIndexToId[subnetworkIndex]));
+		// }
+		//
+		// for (int i = 0; i < sortedIndices.length; i++) {
+		// Set<CyNode> dfsSubnet = new HashSet<CyNode>();
+		// findConnectedComponent(subnetworkNodes,
+		// net.getNode(nodeIndexToId[sortedIndices[0]]), dfsSubnet,
+		// maxSubnetSize, tScores[sortedIndices[i]]);
+		// logger.error("Filter subnet " + subnetworkNodes.size() + " by " +
+		// tScores[sortedIndices[i]]
+		// + " result-size: " + dfsSubnet.size());
+		// subNet = new ArrayList<CyNode>(dfsSubnet);
+		// if (dfsSubnet.size() >= maxSubnetSize) {
+		// break;
+		// }
+		// }
+		//
+		// }
+		//
+		// return subNet;
+	}
 
-			// for (int i=0; i<maxSubnetworkSize; i++) {
-			// subNet.add(net.getNode(nodeIndexToId[sortedIndices[i]]));
-			// }
-
-			Set<CyNode> subnetworkNodes = new HashSet<CyNode>();
-
-			for (Integer subnetworkIndex : subnetworkIndices) {
-				subnetworkNodes.add(net.getNode(nodeIndexToId[subnetworkIndex]));
-			}
-
-			for (int i = 0; i < sortedIndices.length; i++) {
-				Set<CyNode> dfsSubnet = new HashSet<CyNode>();
-				findConnectedComponent(subnetworkNodes, net.getNode(nodeIndexToId[sortedIndices[0]]), dfsSubnet,
-						params.getSubnetSize(), tScores[sortedIndices[i]]);
-				logger.info("Filter subnet " + subnetworkNodes.size() + " by " + tScores[sortedIndices[i]]
-						+ " result-size: " + dfsSubnet.size());
-				subNet = new ArrayList<CyNode>(dfsSubnet);
-				if (dfsSubnet.size() >= params.getSubnetSize()) {
-					break;
-				}
-			}
-
-		}
-
-		return subNet;
+	private int interSectionSize(Set<CyNode> s, Set<CyNode> t) {
+		int cnt = 0;
+		for (CyNode v : s)
+			if (t.contains(v))
+				cnt++;
+		return cnt;
 	}
 
 	private void findConnectedComponent(Set<CyNode> subnetworkToBeSearched, CyNode v, Set<CyNode> result, int maxSize,
@@ -414,7 +512,8 @@ public class GTAAlg extends AbstractTask {
 			result.add(v);
 		}
 		for (CyNode u : params.getCyNetwork().getNeighborList(v, CyEdge.Type.ANY)) {
-			if (!result.contains(u) && tScores[nodeIdToIndex.get(u.getSUID())] >= minTScore)
+			if (subnetworkToBeSearched.contains(u) && !result.contains(u)
+					&& tScores[nodeIdToIndex.get(u.getSUID())] >= minTScore)
 				findConnectedComponent(subnetworkToBeSearched, u, result, maxSize, minTScore);
 		}
 	}
@@ -432,19 +531,33 @@ public class GTAAlg extends AbstractTask {
 			degSum += degrees[i];
 		double degMean = degSum * 1.0 / size;
 		int createdNets = 0;
+
+		TaskIterator layoutingTaskIterator = new TaskIterator();
+
 		for (int ii = 0, tries = 0; ii < size && createdNets < params.getResultingNetworkCount()
 				&& tries < params.getResultingNetworkCount() * GTAAlgParameters.RESULTING_NETWORK_MAX_TRY_IF_NO_ANSWER
 				&& !cancelled; ii++) {
-			taskMonitor.setStatusMessage("Computing nash equilibrium subnet " + (createdNets + 1) + "/" + params.getResultingNetworkCount() + " [" + tries +" tries]");
-			taskMonitor.setProgress(createdNets * 1.0 / params.getResultingNetworkCount() * (progressEnd - progressStart) + progressStart);
+			taskMonitor.setStatusMessage("Computing nash equilibrium subnet " + (createdNets + 1) + "/"
+					+ params.getResultingNetworkCount() + " [" + tries + " tries]");
+			taskMonitor
+					.setProgress(createdNets * 1.0 / params.getResultingNetworkCount() * (progressEnd - progressStart)
+							+ progressStart);
+
+			System.gc();
+
 			int i = sortedIndices[ii];
 			if (degrees[i] >= degMean) {
 				tries++;
 				logger.info("Subnetwork for node " + i + " " + net.getNode(nodeIndexToId[i]));
 
+				taskMonitor.setStatusMessage("Computing nash equilibrium subnet " + (createdNets + 1) + "/"
+						+ params.getResultingNetworkCount() + " [" + tries + " tries], subNetworks generating ...");
 				CyNode parent = net.getNode(nodeIndexToId[i]);
 				List<ThreeLevelSubNetwork> subNetworks = getSubNetworksAroundAVertex(net, parent);
+				logger.info("Subnetwork for node " + i + " " + net.getNode(nodeIndexToId[i]) + " generated");
 
+				taskMonitor.setStatusMessage("Computing nash equilibrium subnet " + (createdNets + 1) + "/"
+						+ params.getResultingNetworkCount() + " [" + tries + " tries], computing nash subnetworks ...");
 				List<CyNode> nashMergedSubnet = computeMergedNashSubNetworks(subNetworks);
 				// //TODO: just for test:
 				// List<CyNode> nashMergedSubnet = new ArrayList<CyNode>();
@@ -465,6 +578,7 @@ public class GTAAlg extends AbstractTask {
 				for (CyNode n : nashMergedSubnet) {
 					subnet.addNode(n);
 				}
+
 				for (CyNode n : nashMergedSubnet)
 					for (CyEdge e : net.getAdjacentEdgeList(n, CyEdge.Type.ANY))
 						if (subnet.containsNode(e.getTarget()) && subnet.containsNode(e.getSource())
@@ -473,17 +587,23 @@ public class GTAAlg extends AbstractTask {
 
 				ServicesUtil.cyNetworkManagerServiceRef.addNetwork(subnet);
 
-//				ServicesUtil.cyEventHelperServiceRef.flushPayloadEvents();
+				// ServicesUtil.cyEventHelperServiceRef.flushPayloadEvents();
 
 				CyNetworkView view = ServicesUtil.cyNetworkViewFactoryServiceRef.createNetworkView(subnet);
 				ServicesUtil.cyNetworkViewManagerServiceRef.addNetworkView(view);
-				
-				
-//				ServicesUtil.cyEventHelperServiceRef.flushPayloadEvents();
+
+				// ServicesUtil.cyEventHelperServiceRef.flushPayloadEvents();
 				ServicesUtil.visualMappingManagerRef.getVisualStyle(view).apply(view);
-				view.getNodeView(net.getNode(nodeIndexToId[i])).setVisualProperty(BasicVisualLexicon.NODE_FILL_COLOR, Color.RED);
+				view.getNodeView(net.getNode(nodeIndexToId[i])).setVisualProperty(BasicVisualLexicon.NODE_FILL_COLOR,
+						Color.RED);
+
+				for (ThreeLevelSubNetwork tlSubNet : subNetworks) {
+					View<CyNode> nv = view.getNodeView(tlSubNet.getLevelTwo());
+					if (nv != null)
+						nv.setVisualProperty(BasicVisualLexicon.NODE_FILL_COLOR, Color.GREEN);
+				}
 				ServicesUtil.cyEventHelperServiceRef.flushPayloadEvents();
-				
+
 				// //TODO: just for test:
 				// for (ThreeLevelSubNetwork subNet : subNetworks) {
 				// view.getNodeView(subNet.getParent()).setVisualProperty(BasicVisualLexicon.NODE_FILL_COLOR,
@@ -491,11 +611,12 @@ public class GTAAlg extends AbstractTask {
 				// view.getNodeView(subNet.getLevelTwo()).setVisualProperty(BasicVisualLexicon.NODE_FILL_COLOR,
 				// Color.GREEN);
 				// }
-				
 
+				TaskIterator it = layoutAlgorithm.createTaskIterator(view, context, CyLayoutAlgorithm.ALL_NODE_VIEWS,
+						"");
+				while (it.hasNext())
+					layoutingTaskIterator.append(it.next());
 
-				insertTasksAfterCurrentTask(
-						layoutAlgorithm.createTaskIterator(view, context, CyLayoutAlgorithm.ALL_NODE_VIEWS, ""));
 				// ServicesUtil.visualMappingManagerRef.setVisualStyle(moduleVS,
 				// view);
 				// view.updateView();
@@ -503,13 +624,37 @@ public class GTAAlg extends AbstractTask {
 				createdNets++;
 			}
 		}
+
+		insertTasksAfterCurrentTask(layoutingTaskIterator);
+
+		// if (layoutingTasks.size() > 0) {
+		// insertTasksAfterCurrentTask(new Task() {
+		// private boolean cancelled = false;
+		//
+		// @Override
+		// public void run(TaskMonitor taskMonitor) throws Exception {
+		// for (TaskIterator t : layoutingTasks) {
+		// if (cancelled)
+		// break;
+		// t.
+		// }
+		// }
+		//
+		// @Override
+		// public void cancel() {
+		// cancelled = true;
+		// }
+		// });
+		// }
+
 		if (createdNets == 0) {
 			EventQueue.invokeLater(new Runnable() {
-		        @Override
-		        public void run() {
-					JOptionPane.showMessageDialog(null, "No network could be created.", "No output", JOptionPane.WARNING_MESSAGE);
-		        }
-		    });
+				@Override
+				public void run() {
+					JOptionPane.showMessageDialog(null, "No network could be created.", "No output",
+							JOptionPane.WARNING_MESSAGE);
+				}
+			});
 		}
 	}
 
@@ -590,7 +735,7 @@ public class GTAAlg extends AbstractTask {
 		// if (level >= subNet.getLevelThree().size() + 1) {
 		int n = subNet.getLevelThree().size() + 1;
 		for (int state = 0; state < (1 << n); state++) {
-			double alpha1 = 1.2, alpha3 = 1;//, alpha2 = 1, C = 2;
+			double alpha1 = 1.2, alpha3 = 1;// , alpha2 = 1, C = 2;
 
 			payoffs[state][0] = tScores[nodeIdToIndex.get(subNet.getLevelTwo().getSUID())]
 					* (inState(state, 0) ? 1 : alpha1);
@@ -634,11 +779,10 @@ public class GTAAlg extends AbstractTask {
 		taskMonitor.setStatusMessage("Converting parameters ....");
 		convertParameters();
 
-		taskMonitor.setProgress(0.3);
-		taskMonitor.setStatusMessage("Computing t-scores ....");
-		tScores = computeAbsTScores();
+		// taskMonitor.setProgress(0.3);
+		// taskMonitor.setStatusMessage("Computing t-scores ....");
 
-		taskMonitor.setProgress(0.35);
+		taskMonitor.setProgress(0.3);
 		taskMonitor.setStatusMessage("Computing degrees ....");
 		degrees = computeDegrees();
 

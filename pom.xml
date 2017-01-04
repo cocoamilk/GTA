@@ -14,11 +14,11 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
-	<version>0.0.1</version>
+	<version>0.0.5</version>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>cocoamilk</groupId>
-	<artifactId>GTA-impl</artifactId>
+	<artifactId>GTA</artifactId>
 	<name>${bundle.symbolicName}</name>
 	<packaging>bundle</packaging>
 
