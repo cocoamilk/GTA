@@ -51,7 +51,7 @@ public final class GTANetworkSelectorPanel extends JPanel implements NetworkAdde
 		add(networkComboBox, BorderLayout.CENTER);
 		updateNetworkList();
 		
-		setBorder(BorderFactory.createTitledBorder("Target Network"));
+		setBorder(BorderFactory.createTitledBorder("Reference Network"));
 		
 	}
 	

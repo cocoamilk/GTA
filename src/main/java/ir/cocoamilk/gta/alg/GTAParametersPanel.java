@@ -159,10 +159,10 @@ public class GTAParametersPanel extends JPanel implements ColumnCreatedListener,
 				cancerAttributeSelectorPanel = new javax.swing.JPanel();
 
 		normalAttributeSelectorPanel.setLayout(new java.awt.GridBagLayout());
-		normalAttributeSelectorPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Normal Cases"));
+		normalAttributeSelectorPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Control"));
 
 		cancerAttributeSelectorPanel.setLayout(new java.awt.GridBagLayout());
-		cancerAttributeSelectorPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Cancer Cases"));
+		cancerAttributeSelectorPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Case"));
 
 		gridBagConstraints = new java.awt.GridBagConstraints();
 		gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
@@ -201,12 +201,12 @@ public class GTAParametersPanel extends JPanel implements ColumnCreatedListener,
 		javax.swing.JPanel advancedConfigPanel = new javax.swing.JPanel(new java.awt.GridBagLayout());
 		advancedConfigPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Advanced Options"));
 
-		generateTScoresCheckBox = new Checkbox("Generate T-Scores");
+		generateTScoresCheckBox = new Checkbox("Show t-scores");
 		generateTScoresCheckBox.setState(true);
 		advancedConfigPanel.add(generateTScoresCheckBox,
 				gridConstraint(0, 0, 1, 2, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL));
 
-		generateDegreesCheckBox = new Checkbox("Generate degrees");
+		generateDegreesCheckBox = new Checkbox("Show degrees");
 		generateDegreesCheckBox.setState(true);
 		advancedConfigPanel.add(generateDegreesCheckBox,
 				gridConstraint(0, 1, 1, 2, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL));
@@ -229,7 +229,7 @@ public class GTAParametersPanel extends JPanel implements ColumnCreatedListener,
 		advancedConfigPanel.add(levelTwoSubnetMaxSize,
 				gridConstraint(1, 3, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL));
 
-		java.awt.Label nuumberOfTargetNetworksLabel = new java.awt.Label("No. of results");
+		java.awt.Label nuumberOfTargetNetworksLabel = new java.awt.Label("Noumber of results");
 		advancedConfigPanel.add(nuumberOfTargetNetworksLabel,
 				gridConstraint(0, 4, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL));
 		numberOfTargetNetworks = new java.awt.Choice();

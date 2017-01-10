@@ -411,7 +411,10 @@ public class GTAAlg extends AbstractTask {
 				if ((allPotentialMutualCount - ifPotentialMutualCount) * 1.0
 						/ (allMutualCount - ifMutualCount) > (allPotentialMutualCount) * 1.0 / (allMutualCount)) {
 					for (CyNode u : subnetNei.get(v)) {
-						subnetNei.get(u).remove(v);
+						//TODO: following if is needed, since if v and u are equal, concurrent modification exception will occure,
+						// Is this a good way to handle it?
+						if (!v.equals(u))
+							subnetNei.get(u).remove(v);
 					}
 					toBeRemovedNodes.add(v);
 					allMutualCount -= ifMutualCount;

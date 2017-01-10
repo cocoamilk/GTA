@@ -3,7 +3,7 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
 	<properties>
-		<bundle.symbolicName>GTA</bundle.symbolicName>
+		<bundle.symbolicName>CytoGTA</bundle.symbolicName>
 		<bundle.namespace>ir.cocoamilk.gta</bundle.namespace>
 		<cytoscape.api.version>3.0.1</cytoscape.api.version>
 		<maven-bundle-plugin.version>2.3.4</maven-bundle-plugin.version>
@@ -14,11 +14,11 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
-	<version>0.0.5</version>
+	<version>0.0.6</version>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>cocoamilk</groupId>
-	<artifactId>GTA</artifactId>
+	<artifactId>CytoGTA</artifactId>
 	<name>${bundle.symbolicName}</name>
 	<packaging>bundle</packaging>
 
